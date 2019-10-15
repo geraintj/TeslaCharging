@@ -1,22 +1,34 @@
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Logging;
+using TeslaCharging.Entities;
 
 namespace TeslaCharging
 {
-    public static class OrchestrateCheck
+    public static class CheckChargeStatus
     {
         [FunctionName("OrchestrateCheck")]
         public static async Task RunOrchestrator(
-            [OrchestrationTrigger] DurableOrchestrationContext context)
+            [OrchestrationTrigger] DurableOrchestrationContext context, ILogger log)
         {
             // get username & password from input
+            var loginData = context.GetInput<TeslaLogin>();
+            log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
 
             // set up monitor
+            while (true)
+            {
+                await context.CallActivityAsync("CallTeslaAPI", loginData);
+
+                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(60);
+                log.LogInformation($"************** Sleeping orchestration until {nextCheckTime.ToLongTimeString()}");
+                await context.CreateTimer(nextCheckTime, CancellationToken.None);
+            }
 
             // while monitor running
             // {
@@ -36,9 +48,9 @@ namespace TeslaCharging
         }
 
         [FunctionName("CallTeslaAPI")]
-        public static object CallTeslaApi([ActivityTrigger] string userName, string password)
+        public static void CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
         {
-            
+            log.LogInformation("************** Call API");
         }
 
         [FunctionName("OrchestrateCheck_HttpStart")]
@@ -48,9 +60,10 @@ namespace TeslaCharging
             ILogger log)
         {
             // Function input comes from the request content.
-            string instanceId = await starter.StartNewAsync("OrchestrateCheck", null);
+            var loginData = await req.Content.ReadAsAsync<TeslaLogin>();
+            string instanceId = await starter.StartNewAsync("OrchestrateCheck", loginData);
 
-            log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
+            log.LogInformation($"************** Started orchestration with ID = '{instanceId}'.");
 
             return starter.CreateCheckStatusResponse(req, instanceId);
         }
