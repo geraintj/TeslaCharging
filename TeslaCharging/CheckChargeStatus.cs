@@ -16,6 +16,7 @@ namespace TeslaCharging
 {
     public static class CheckChargeStatus
     {
+        static ChargingStatus lastChargeStatus = ChargingStatus.Other;
 
         [FunctionName("OrchestrateCheck")]
         public static async Task RunOrchestrator(
@@ -23,33 +24,29 @@ namespace TeslaCharging
         {
             // get username & password from input
             var loginData = context.GetInput<TeslaLogin>();
-            log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
+            //log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
 
-            // set up entity
-            var entityId = new EntityId(nameof(LastChargeState), loginData.Email);
-
-            log.LogInformation($"************** Last charge status in orchestration {await context.CallEntityAsync<ChargingStatus>(entityId, "Get")}");
-            
             // set up monitor
             while (true)
             {
-                log.LogInformation($"************** Waking orchestration");
-
-                var lastChargeStatus = await context.CallEntityAsync<ChargingStatus>(entityId, "Get");
-                log.LogInformation($"************** Last charge status in monitor {lastChargeStatus}");
                 var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", loginData);
 
-                if (chargeState.ChargingState != lastChargeStatus)
+                if (chargeState != null && chargeState.ChargingState != lastChargeStatus)
                 {
-                    log.LogInformation("************** SAVE TO DB");
+                    if (lastChargeStatus == ChargingStatus.Charging 
+                        && (chargeState.ChargingState == ChargingStatus.Complete || chargeState.ChargingState == ChargingStatus.Disconnected ))
+                    {
+                        log.LogInformation("************** SAVE TO DB");
+                    }
                     log.LogInformation($"************** Setting LastChargeStatus in Entity");
-                    context.SignalEntity(entityId, "Set", chargeState.ChargingState);
+                    lastChargeStatus = chargeState.ChargingState;
+                }
+                else
+                {
+                    log.LogInformation("************** Charge status not changed");
                 }
 
-                //log.LogInformation($"Charge status changed: {(chargeState.ChargingState == await lastChargeStatusProxy.Get()).ToString()}");
-                
-                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(60);
-                log.LogInformation($"************** Sleeping orchestration until {nextCheckTime.ToLongTimeString()}");
+                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(30);
                 await context.CreateTimer(nextCheckTime, CancellationToken.None);
             }
 
@@ -77,7 +74,6 @@ namespace TeslaCharging
             {
                 try
                 {
-                    log.LogInformation("************** Call API");
                     var client = new HttpClient();
                     client.DefaultRequestHeaders.Add("User-Agent", "stuff");
                     var parameters = new Dictionary<string, string>()
@@ -124,11 +120,8 @@ namespace TeslaCharging
             [DurableClient]IDurableOrchestrationClient starter,
             ILogger log)
         {
-            // Function input comes from the request content.
             var loginData = await req.Content.ReadAsAsync<TeslaLogin>();
             string instanceId = await starter.StartNewAsync("OrchestrateCheck", loginData);
-
-            log.LogInformation($"************** Started orchestration with ID = '{instanceId}'.");
 
             return starter.CreateCheckStatusResponse(req, instanceId);
         }
