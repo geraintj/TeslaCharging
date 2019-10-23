@@ -4,6 +4,7 @@
     {
         Other,
         Charging,
+        Stopped,
         Complete,
         Disconnected
     }

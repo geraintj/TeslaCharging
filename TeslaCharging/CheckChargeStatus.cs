@@ -33,10 +33,10 @@ namespace TeslaCharging
 
                 if (chargeState != null && chargeState.ChargingState != lastChargeStatus)
                 {
-                    if (lastChargeStatus == ChargingStatus.Charging 
-                        && (chargeState.ChargingState == ChargingStatus.Complete || chargeState.ChargingState == ChargingStatus.Disconnected ))
+                    if (lastChargeStatus == ChargingStatus.Charging && chargeState.ChargingState != ChargingStatus.Charging)
                     {
                         log.LogInformation("************** SAVE TO DB");
+                        await context.CallActivityAsync("SaveCharge", chargeState);
                     }
                     log.LogInformation($"************** Setting LastChargeStatus in Entity");
                     lastChargeStatus = chargeState.ChargingState;
@@ -103,6 +103,7 @@ namespace TeslaCharging
                             $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/charge_state"));
                     var chargeStateResult = JsonConvert.DeserializeObject<ChargeStateResponse>(chargeStateResponse);
 
+                    chargeStateResult.Response.Vin = vehiclesResult.Response[0].Vin;
                     return chargeStateResult.Response;
                 }
                 catch (Exception e)
@@ -112,6 +113,22 @@ namespace TeslaCharging
                 }
             }
             return null;
+        }
+
+        [FunctionName("SaveCharge")]
+        public static async void SaveCharge([ActivityTrigger] ChargeState charge, [CosmosDB(
+            databaseName: "ChargeState",
+            collectionName: "Charges",
+            ConnectionStringSetting = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
+        {
+            var newCharge = new TeslaCharge()
+            {
+                Vin = charge.Vin,
+                Amount = charge.ChargeEnergyAdded,
+                Date = DateTime.UtcNow,
+                Location = "St Julians"
+            };
+            await teslaCharge.AddAsync(newCharge);
         }
 
         [FunctionName("OrchestrateCheck_HttpStart")]
