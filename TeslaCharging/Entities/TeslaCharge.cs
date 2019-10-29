@@ -8,5 +8,6 @@ namespace TeslaCharging.Entities
         public decimal Amount { get; set; }
         public string Vin { get; set; }
         public string Location { get; set; }
+        public string ChargingStatus { get; set; }
     }
 }
