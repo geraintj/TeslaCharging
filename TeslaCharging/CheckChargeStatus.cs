@@ -16,30 +16,34 @@ namespace TeslaCharging
 {
     public static class CheckChargeStatus
     {
-        static ChargingStatus lastChargeStatus = ChargingStatus.Other;
-
         [FunctionName("OrchestrateCheck")]
         public static async Task RunOrchestrator(
-            [OrchestrationTrigger] IDurableOrchestrationContext context, ILogger log)
+            [OrchestrationTrigger] IDurableOrchestrationContext context,
+            ILogger log)
         {
             // get username & password from input
-            var loginData = context.GetInput<TeslaLogin>();
+            var orchestrationData = context.GetInput<OrchestrationData>();
             //log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
+
 
             // set up monitor
             while (true)
             {
-                var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", loginData);
+                var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", orchestrationData.LoginData);
+
+                var lastChargeStatus = await context.CallEntityAsync<ChargingStatus>(orchestrationData.EntityId, "Get");
 
                 if (chargeState != null && chargeState.ChargingState != lastChargeStatus)
                 {
-                    if (lastChargeStatus == ChargingStatus.Charging && chargeState.ChargingState != ChargingStatus.Charging)
+                    if (lastChargeStatus == ChargingStatus.Charging)
                     {
                         log.LogInformation("************** SAVE TO DB");
                         await context.CallActivityAsync("SaveCharge", chargeState);
-                    }
-                    log.LogInformation($"************** Setting LastChargeStatus in Entity");
-                    lastChargeStatus = chargeState.ChargingState;
+                    } 
+                    log.LogInformation($"************** Setting LastChargeStatus in Entity to {chargeState.ChargingState.ToString()}. Replaying {context.IsReplaying}");
+                    //await entityClient.SignalEntityAsync<ILastChargeState>(entityId, op => op.Set(chargeState.ChargingState));
+                    context.SignalEntity(orchestrationData.EntityId, "Set", chargeState.ChargingState);
+                    //lastChargeStatus = chargeState.ChargingState;
                 }
                 else
                 {
@@ -138,8 +142,11 @@ namespace TeslaCharging
             ILogger log)
         {
             var loginData = await req.Content.ReadAsAsync<TeslaLogin>();
-            string instanceId = await starter.StartNewAsync("OrchestrateCheck", loginData);
 
+            var entityId = new EntityId(nameof(LastChargeState), loginData.Email);
+            //await entityClient.SignalEntityAsync(entityId, "Set", ChargingStatus.Other);
+
+            string instanceId = await starter.StartNewAsync("OrchestrateCheck", new OrchestrationData() { LoginData = loginData, EntityId = entityId});
             return starter.CreateCheckStatusResponse(req, instanceId);
         }
     }
