@@ -101,10 +101,14 @@ namespace TeslaCharging
                             new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles"));
                     var vehiclesResult = JsonConvert.DeserializeObject<VehiclesResponse>(vehiclesResponse);
 
-                    
+                    var wakeUpResponse = await client.PostAsync(new Uri(
+                        $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/wake_up"), null);
+                    var wakeUpResult = JsonConvert.DeserializeObject<WakeUpResponse>(await wakeUpResponse.Content.ReadAsStringAsync());
+
                     var chargeStateResponse = await client.GetStringAsync(
                         new Uri(
                             $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/charge_state"));
+                    
                     var chargeStateResult = JsonConvert.DeserializeObject<ChargeStateResponse>(chargeStateResponse);
 
                     chargeStateResult.Response.Vin = vehiclesResult.Response[0].Vin;
