@@ -136,7 +136,15 @@ namespace TeslaCharging
                 Date = DateTime.UtcNow,
                 Location = "St Julians"
             };
-            await teslaCharge.AddAsync(newCharge);
+            try
+            {
+                await teslaCharge.AddAsync(newCharge);
+            }
+            catch (Exception e)
+            {
+                log.LogError(e.Message, e);
+                throw;
+            }
         }
 
         [FunctionName("OrchestrateCheck_HttpStart")]
