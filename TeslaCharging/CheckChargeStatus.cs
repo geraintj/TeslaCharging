@@ -37,7 +37,7 @@ namespace TeslaCharging
                 {
                     if (lastChargeStatus == ChargingStatus.Charging)
                     {
-                        log.LogInformation("************** SAVE TO DB");
+                        log.LogInformation($"************** SAVE TO DB, new: {chargeState.ChargingState}; old: {lastChargeStatus}");
                         await context.CallActivityAsync("SaveCharge", chargeState);
                     } 
                     log.LogInformation($"************** Setting LastChargeStatus in Entity to {chargeState.ChargingState.ToString()}. Replaying {context.IsReplaying}");
@@ -47,7 +47,7 @@ namespace TeslaCharging
                 }
                 else
                 {
-                    log.LogInformation("************** Charge status not changed");
+                    log.LogInformation($"************** Charge status not changed from {lastChargeStatus.ToString()}");
                 }
 
                 var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(30);
@@ -139,6 +139,7 @@ namespace TeslaCharging
             try
             {
                 await teslaCharge.AddAsync(newCharge);
+                log.LogInformation("************** CHARGING DATA SAVED TO DB");
             }
             catch (Exception e)
             {
