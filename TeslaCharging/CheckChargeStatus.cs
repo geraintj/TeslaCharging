@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Documents.Client;
+using Microsoft.Azure.Documents.Linq;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
@@ -37,6 +42,10 @@ namespace TeslaCharging
                 {
                     if (lastChargeStatus == ChargingStatus.Charging)
                     {
+                        var savedChargesResponse = await context.CallActivityAsync<IActionResult>("GetSavedCharges", chargeState.Vin);
+                        //var savedChargeResponse = await savedChargesResponse.ExecuteResultAsync();
+
+                        //var lastSavedCharge = JsonConvert.DeserializeObject<List<TeslaCharge>>(savedChargesResponse)
                         log.LogInformation($"************** SAVE TO DB, new: {chargeState.ChargingState}; old: {lastChargeStatus}");
                         await context.CallActivityAsync("SaveCharge", chargeState);
                     } 
@@ -136,6 +145,7 @@ namespace TeslaCharging
                 Date = DateTime.UtcNow,
                 Location = "St Julians"
             };
+
             try
             {
                 await teslaCharge.AddAsync(newCharge);
@@ -146,6 +156,38 @@ namespace TeslaCharging
                 log.LogError(e.Message, e);
                 throw;
             }
+        }
+
+        [FunctionName("GetSavedCharges")]
+        public static async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
+            [CosmosDB(ConnectionStringSetting = "CosmosConnection")] DocumentClient client,
+            ILogger log)
+        {
+            log.LogInformation("C# HTTP trigger function processed a request.");
+
+            // Validation and error checking omitted for demo purposes
+
+            string vin = req.Query["vin"];
+
+            Uri chargeCollectionUri = UriFactory.CreateDocumentCollectionUri(databaseId: "ChargeState", collectionId: "Charges");
+
+            var options = new FeedOptions { EnableCrossPartitionQuery = true }; // Enable cross partition query
+
+            IDocumentQuery<TeslaCharge> query = client.CreateDocumentQuery<TeslaCharge>(chargeCollectionUri, options)
+                .Where(c => c.Vin == vin)
+                .AsDocumentQuery();
+
+            var savedCharges = new List<TeslaCharge>();
+
+            while (query.HasMoreResults)
+            {
+                foreach (TeslaCharge charge in await query.ExecuteNextAsync())
+                {
+                    savedCharges.Add(charge);
+                }
+            }
+
+            return new OkObjectResult(savedCharges);
         }
 
         [FunctionName("OrchestrateCheck_HttpStart")]
