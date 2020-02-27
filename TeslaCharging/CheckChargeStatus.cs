@@ -42,10 +42,6 @@ namespace TeslaCharging
                 {
                     if (lastChargeStatus == ChargingStatus.Charging)
                     {
-                        var savedChargesResponse = await context.CallActivityAsync<IActionResult>("GetSavedCharges", chargeState.Vin);
-                        //var savedChargeResponse = await savedChargesResponse.ExecuteResultAsync();
-
-                        //var lastSavedCharge = JsonConvert.DeserializeObject<List<TeslaCharge>>(savedChargesResponse)
                         log.LogInformation($"************** SAVE TO DB, new: {chargeState.ChargingState}; old: {lastChargeStatus}");
                         await context.CallActivityAsync("SaveCharge", chargeState);
                     } 
@@ -62,22 +58,6 @@ namespace TeslaCharging
                 var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(30);
                 await context.CreateTimer(nextCheckTime, CancellationToken.None);
             }
-
-            // while monitor running
-            // {
-            //      get charge state from  API
-            //      get last charge state (LCS) from entity
-            //      if LCS not null
-            //      {
-            //          if LCS.charging_state != CCS.charging_state && CCS.charging_state == "Charging"
-            //          {
-            //              save to db { charge_energy_added, charger_power, timestamp }
-            //          }
-            //      }
-            //      save current charge state (CCS) to entity { charging_state, charger_power }
-            // }
-
-
         }
 
         [FunctionName("CallTeslaAPI")]
@@ -133,7 +113,7 @@ namespace TeslaCharging
         }
 
         [FunctionName("SaveCharge")]
-        public static async void SaveCharge([ActivityTrigger] ChargeState charge, [CosmosDB(
+        public static async Task SaveCharge([ActivityTrigger] ChargeState charge, [CosmosDB(
             databaseName: "ChargeState",
             collectionName: "Charges",
             ConnectionStringSetting = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
