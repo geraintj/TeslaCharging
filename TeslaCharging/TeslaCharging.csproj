@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <AzureFunctionsVersion>v2</AzureFunctionsVersion>
@@ -7,6 +7,9 @@
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.CosmosDB" Version="3.0.4" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.DurableTask" Version="2.0.0-beta3" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="1.0.30-beta1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GoogleApi.Geocode\GoogleApi.Geocode.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

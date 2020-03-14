@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using LocationTest;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents.Client;
@@ -63,7 +64,7 @@ namespace TeslaCharging
         [FunctionName("CallTeslaAPI")]
         public static async Task<ChargeState> CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
         {
-            if (loginData != null )
+            if (loginData != null)
             {
                 try
                 {
@@ -97,10 +98,16 @@ namespace TeslaCharging
                     var chargeStateResponse = await client.GetStringAsync(
                         new Uri(
                             $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/charge_state"));
-                    
                     var chargeStateResult = JsonConvert.DeserializeObject<ChargeStateResponse>(chargeStateResponse);
 
+                    var driveStateResponse = await client.GetStringAsync(new Uri(
+                        $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/drive_state"));
+                    var driveStateResult = JsonConvert.DeserializeObject<DriveStateResponse>(driveStateResponse);
+
+                    chargeStateResult.Response.Latitude = driveStateResult.Response.Latitude;
+                    chargeStateResult.Response.Longitude = driveStateResult.Response.Longitude;
                     chargeStateResult.Response.Vin = vehiclesResult.Response[0].Vin;
+
                     return chargeStateResult.Response;
                 }
                 catch (Exception e)
@@ -118,12 +125,18 @@ namespace TeslaCharging
             collectionName: "Charges",
             ConnectionStringSetting = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
         {
+            var client = new HttpClient();
+            var locationResponse = await client.PostAsync(Environment.GetEnvironmentVariable(
+                "GoogleReverseGeocodeUri") +
+                $"?latlng={charge.Latitude},{charge.Longitude}&key={Environment.GetEnvironmentVariable("GoogleMapsApiKey")}", null);
+            var locationResult = JsonConvert.DeserializeObject<ReverseResponse>(await locationResponse.Content.ReadAsStringAsync());
+
             var newCharge = new TeslaCharge()
             {
                 Vin = charge.Vin,
                 Amount = charge.ChargeEnergyAdded,
                 Date = DateTime.UtcNow,
-                Location = "St Julians"
+                Location = locationResult.Results[0].FormattedAddress
             };
 
             try
