@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Microsoft.Azure.WebJobs;
+﻿using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using TeslaCharging.Model;
 
-namespace TeslaCharging.Entities
+namespace TeslaCharging
 {
     public class OrchestrationData
     {

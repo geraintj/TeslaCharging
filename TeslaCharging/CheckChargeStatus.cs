@@ -11,12 +11,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.Documents.Linq;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using TeslaCharging.Entities;
+using TeslaCharging.Model;
 
 namespace TeslaCharging
 {
@@ -47,9 +48,8 @@ namespace TeslaCharging
                         await context.CallActivityAsync("SaveCharge", chargeState);
                     } 
                     log.LogInformation($"************** Setting LastChargeStatus in Entity to {chargeState.ChargingState.ToString()}. Replaying {context.IsReplaying}");
-                    //await entityClient.SignalEntityAsync<ILastChargeState>(entityId, op => op.Set(chargeState.ChargingState));
+
                     context.SignalEntity(orchestrationData.EntityId, "Set", chargeState.ChargingState);
-                    //lastChargeStatus = chargeState.ChargingState;
                 }
                 else
                 {
