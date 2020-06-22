@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
@@ -14,6 +15,13 @@ namespace TeslaCharging.Tests
 {
     public class OrchestratorTests
     {
+        private CheckChargeStatus _checkChargeStatus;
+        public OrchestratorTests()
+        {
+            var clientMock = new Mock<IHttpClientFactory>();
+
+        }
+        
         public static IEnumerable<object[]> GetNonChargingStatuses()
         {
             yield return new object[] { ChargingStatus.Disconnected };
@@ -33,7 +41,7 @@ namespace TeslaCharging.Tests
             durableOrchestrationContextMock.ReturnChargingStatus = ChargingStatus.Charging;
 
             // Act
-            var result = CheckChargeStatus.RunOrchestrator(durableOrchestrationContextMock, logger.Object);
+            //var result = CheckChargeStatus.RunOrchestrator(durableOrchestrationContextMock, logger.Object);
 
             ArrayList saveChargeApiCalls = new ArrayList();
             durableOrchestrationContextMock.CallActivityCalls.TryGetValue("SaveCharge", out saveChargeApiCalls);
@@ -56,7 +64,7 @@ namespace TeslaCharging.Tests
             durableOrchestrationContextMock.ReturnChargingStatus = ChargingStatus.Charging;
 
             // Act
-            var result = CheckChargeStatus.RunOrchestrator(durableOrchestrationContextMock, logger.Object);
+            //var result = CheckChargeStatus.RunOrchestrator(durableOrchestrationContextMock, logger.Object);
 
             ArrayList saveChargeApiCalls;
             Assert.False(durableOrchestrationContextMock.CallActivityCalls.TryGetValue("SaveCharge", out saveChargeApiCalls));
@@ -77,7 +85,7 @@ namespace TeslaCharging.Tests
             durableOrchestrationContextMock.ReturnChargingStatus = ChargingStatus.Charging;
 
             // Act
-            var result = CheckChargeStatus.RunOrchestrator(durableOrchestrationContextMock, logger.Object);
+            //gularDockervar result = CheckChargeStatus.RunOrchestrator(durableOrchestrationContextMock, logger.Object);
 
             ArrayList saveChargeApiCalls = new ArrayList();
             durableOrchestrationContextMock.CallActivityCalls.TryGetValue("SaveCharge", out saveChargeApiCalls);

@@ -21,10 +21,17 @@ using TeslaCharging.Model;
 
 namespace TeslaCharging
 {
-    public static class CheckChargeStatus
+    public class CheckChargeStatus
     {
+        private readonly HttpClient _httpClient;
+
+        public CheckChargeStatus(IHttpClientFactory httpClientFactory)
+        {
+            _httpClient = httpClientFactory.CreateClient();
+        }
+
         [FunctionName("OrchestrateCheck")]
-        public static async Task RunOrchestrator(
+        public async Task RunOrchestrator(
             [OrchestrationTrigger] IDurableOrchestrationContext context,
             ILogger log)
         {
@@ -62,14 +69,13 @@ namespace TeslaCharging
         }
 
         [FunctionName("CallTeslaAPI")]
-        public static async Task<ChargeState> CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
+        public async Task<ChargeState> CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
         {
             if (loginData != null)
             {
                 try
                 {
-                    var client = new HttpClient();
-                    client.DefaultRequestHeaders.Add("User-Agent", "stuff");
+                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "stuff");
                     var parameters = new Dictionary<string, string>()
                     {
                         {"grant_type", "password"}, {"client_id", Environment.GetEnvironmentVariable("TeslaClientId")},
@@ -79,28 +85,28 @@ namespace TeslaCharging
                     var encodedContent = new FormUrlEncodedContent(parameters);
 
                     var tokenResponse =
-                        await client.PostAsync(new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}oauth/token"),
+                        await _httpClient.PostAsync(new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}oauth/token"),
                             encodedContent);
                     var tokenResult =
                         JsonConvert.DeserializeObject<TokenResponse>(await tokenResponse.Content.ReadAsStringAsync());
-                    client.DefaultRequestHeaders.Authorization =
+                    _httpClient.DefaultRequestHeaders.Authorization =
                         new AuthenticationHeaderValue("Bearer", tokenResult.AccessToken);
 
                     var vehiclesResponse =
-                        await client.GetStringAsync(
+                        await _httpClient.GetStringAsync(
                             new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles"));
                     var vehiclesResult = JsonConvert.DeserializeObject<VehiclesResponse>(vehiclesResponse);
 
-                    var wakeUpResponse = await client.PostAsync(new Uri(
+                    var wakeUpResponse = await _httpClient.PostAsync(new Uri(
                         $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/wake_up"), null);
                     var wakeUpResult = JsonConvert.DeserializeObject<WakeUpResponse>(await wakeUpResponse.Content.ReadAsStringAsync());
 
-                    var chargeStateResponse = await client.GetStringAsync(
+                    var chargeStateResponse = await _httpClient.GetStringAsync(
                         new Uri(
                             $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/charge_state"));
                     var chargeStateResult = JsonConvert.DeserializeObject<ChargeStateResponse>(chargeStateResponse);
 
-                    var driveStateResponse = await client.GetStringAsync(new Uri(
+                    var driveStateResponse = await _httpClient.GetStringAsync(new Uri(
                         $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/drive_state"));
                     var driveStateResult = JsonConvert.DeserializeObject<DriveStateResponse>(driveStateResponse);
 
@@ -120,7 +126,7 @@ namespace TeslaCharging
         }
 
         [FunctionName("SaveCharge")]
-        public static async Task SaveCharge([ActivityTrigger] ChargeState charge, [CosmosDB(
+        public async Task SaveCharge([ActivityTrigger] ChargeState charge, [CosmosDB(
             databaseName: "ChargeState",
             collectionName: "Charges",
             ConnectionStringSetting = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
@@ -152,7 +158,7 @@ namespace TeslaCharging
         }
 
         [FunctionName("GetSavedCharges")]
-        public static async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
+        public async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
             [CosmosDB(ConnectionStringSetting = "CosmosConnection")] DocumentClient client,
             ILogger log)
         {
@@ -184,7 +190,7 @@ namespace TeslaCharging
         }
 
         [FunctionName("OrchestrateCheck_HttpStart")]
-        public static async Task<HttpResponseMessage> HttpStart(
+        public async Task<HttpResponseMessage> HttpStart(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")]HttpRequestMessage req,
             [DurableClient]IDurableOrchestrationClient starter,
             ILogger log)
