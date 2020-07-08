@@ -9,8 +9,6 @@
     <None Remove="Entities\**" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="ILastChargeState.cs" />
-    <Compile Remove="LastChargeState.cs" />
     <Compile Remove="OrchestrationData.cs" />
   </ItemGroup>
   <ItemGroup>
