@@ -5,6 +5,7 @@
                 <th>Date</th>
                 <th>Location</th>
                 <th class="text-center">Charge Amount (kWh)</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -12,6 +13,7 @@
                 <td>{{charge.date | date : 'medium'}}</td>
                 <td>{{charge.location}}</td>
                 <td class="text-center">{{charge.amount}}</td>
+                <td><button type="button" class="btn btn-outline-danger btn-sm" (click)='onDelete(charge.id)'>Delete</button></td>
             </tr>
         </tbody>
     </table>

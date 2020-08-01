@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Threading;
-using System.Threading.Tasks;
 using LocationTest;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,10 +6,18 @@ using Microsoft.Azure.Documents.Linq;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.Azure.WebJobs.Host;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Http;
+using Microsoft.Azure.Documents;
 using TeslaCharging.Model;
 
 namespace TeslaCharging
@@ -44,6 +45,7 @@ namespace TeslaCharging
             while (true)
             {
                 var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", orchestrationData.LoginData);
+                chargeState.ChargeStateEntityId = orchestrationData.EntityId;
 
                 var lastChargeStatus = await context.CallEntityAsync<ChargingStatus>(orchestrationData.EntityId, "Get");
 
@@ -158,19 +160,16 @@ namespace TeslaCharging
         }
 
         [FunctionName("GetSavedCharges")]
-        public async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
+        public async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = "charges/{vin}")] HttpRequest req,
             [CosmosDB(ConnectionStringSetting = "CosmosConnection")] DocumentClient client,
-            ILogger log)
+            ILogger log, string vin)
         {
+            //TODO: validation for null vin
             log.LogInformation("C# HTTP trigger function processed a request.");
-
-            // Validation and error checking omitted for demo purposes
-
-            string vin = req.Query["vin"];
 
             Uri chargeCollectionUri = UriFactory.CreateDocumentCollectionUri(databaseId: "ChargeState", collectionId: "Charges");
 
-            var options = new FeedOptions { EnableCrossPartitionQuery = true }; // Enable cross partition query
+            var options = new FeedOptions { EnableCrossPartitionQuery = true }; 
 
             IDocumentQuery<TeslaCharge> query = client.CreateDocumentQuery<TeslaCharge>(chargeCollectionUri, options)
                 .Where(c => c.Vin == vin)
@@ -189,11 +188,43 @@ namespace TeslaCharging
             return new OkObjectResult(savedCharges);
         }
 
+        [FunctionName("DeleteSavedCharge")]
+        public async Task<IActionResult> DeleteSavedCharge([HttpTrigger(AuthorizationLevel.Function, "delete", Route = "charges/{vin}/{id}")]
+            HttpRequest req,
+            [CosmosDB(ConnectionStringSetting = "CosmosConnection")]
+            DocumentClient client,
+            ILogger log,
+            string vin,
+            string id)
+        {
+            //TODO: validation for null  id
+            log.LogInformation("C# HTTP trigger function processed a request.");
+
+            var documentUri = UriFactory.CreateDocumentUri(databaseId: "ChargeState", collectionId: "Charges", id);
+            try
+            {
+                var response = await client.DeleteDocumentAsync(documentUri, new RequestOptions() { PartitionKey = new PartitionKey(Undefined.Value) });
+
+                if (response.StatusCode == HttpStatusCode.Accepted
+                    || response.StatusCode == HttpStatusCode.Created
+                    || response.StatusCode == HttpStatusCode.NoContent)
+                {
+                    return new OkObjectResult(id);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, $"Attempt to delete document with id {id} " + ex.Message);
+            }
+            return new InternalServerErrorResult();
+
+        }
+
         [FunctionName("OrchestrateCheck_HttpStart")]
         public async Task<HttpResponseMessage> HttpStart(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")]HttpRequestMessage req,
             [DurableClient]IDurableOrchestrationClient starter,
-            ILogger log)
+            ILogger log) 
         {
             var loginData = await req.Content.ReadAsAsync<TeslaLogin>();
 

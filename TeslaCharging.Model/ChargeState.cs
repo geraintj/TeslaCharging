@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Newtonsoft.Json;
 
 namespace TeslaCharging.Model
 {
@@ -12,5 +13,6 @@ namespace TeslaCharging.Model
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public long Timestamp { get; set; }
+        public EntityId ChargeStateEntityId { get; set; }
     }
 }

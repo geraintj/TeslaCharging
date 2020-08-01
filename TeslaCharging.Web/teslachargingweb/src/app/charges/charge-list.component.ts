@@ -15,6 +15,10 @@ export class ChargeListComponent implements OnInit {
   constructor(private chargesService: ChargesService) { }
 
   ngOnInit(): void {
+    this.getCharges();
+  } 
+
+  getCharges() : void {
     this.chargesService.getData().subscribe({
       next: charges => {
         this.charges = charges.sort(function(a,b){
@@ -25,5 +29,12 @@ export class ChargeListComponent implements OnInit {
         console.log("On page: " + this.charges);
       }
     });
-  } 
+  }
+
+  onDelete(id: string): void {
+    console.log("Quieres a eliminar "+ id);
+    this.chargesService.deleteCharge(id).subscribe();
+    console.log("Reload");
+    this.getCharges();
+  }
 }
