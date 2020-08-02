@@ -19,8 +19,11 @@ export class ChargesService {
     constructor(private http: HttpClient) { }
 
     getData(): Observable<ICharge[]> {
-        let httpParams = new HttpParams()
-        .set('code', this.code);        
+        let httpParams = new HttpParams();
+        if (this.code)
+        {
+            httpParams.set('code', this.code);
+        }
 
         return this.http.get<ICharge[]>(this.url + '5YJ3F7EB9KF490943', { params: httpParams })
         .pipe(
