@@ -45,7 +45,6 @@ namespace TeslaCharging
             while (true)
             {
                 var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", orchestrationData.LoginData);
-                chargeState.ChargeStateEntityId = orchestrationData.EntityId;
 
                 var lastChargeStatus = await context.CallEntityAsync<ChargingStatus>(orchestrationData.EntityId, "Get");
 

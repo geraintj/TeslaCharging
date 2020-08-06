@@ -13,6 +13,5 @@ namespace TeslaCharging.Model
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public long Timestamp { get; set; }
-        public EntityId ChargeStateEntityId { get; set; }
     }
 }

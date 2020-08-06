@@ -19,12 +19,10 @@ export class ChargesService {
     constructor(private http: HttpClient) { }
 
     getData(): Observable<ICharge[]> {
-        let httpParams = new HttpParams();
-        if (this.code)
-        {
-            httpParams.set('code', this.code);
-        }
-
+        let httpParams = new HttpParams()
+            .set('code', this.code);
+        
+        console.log('allweddau params ' + httpParams.keys.length);
         return this.http.get<ICharge[]>(this.url + '5YJ3F7EB9KF490943', { params: httpParams })
         .pipe(
             tap(data => console.log('All: ' + JSON.stringify(data)))
@@ -32,12 +30,9 @@ export class ChargesService {
     };
 
     deleteCharge(id: string): Observable<ICharge> {
-        let httpParams = new HttpParams();
-        if (this.code)
-        {
-            httpParams.set('code', this.code);
-        }
-
+        let httpParams = new HttpParams()
+        .set('code', this.code);
+        
         var deleteUrl = encodeURI(this.url + '5YJ3F7EB9KF490943/' + id);
         return this.http.delete<ICharge>(deleteUrl, { params: httpParams });
     };
