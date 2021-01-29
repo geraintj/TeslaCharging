@@ -1,0 +1,20 @@
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead class="thead-dark">
+            <tr>
+                <th>Date</th>
+                <th>Location</th>
+                <th class="text-center">Charge Amount (kWh)</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr *ngFor='let charge of charges'>
+                <td>{{charge.date | date : 'medium'}}</td>
+                <td>{{charge.location}}</td>
+                <td class="text-center">{{charge.amount}}</td>
+                <td><button type="button" class="btn btn-outline-danger btn-sm" (click)='onDelete(charge.id)'>Delete</button></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
