@@ -14,10 +14,13 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Azure.Documents;
+using Newtonsoft.Json.Linq;
+using TeslaCharging;
 using TeslaCharging.Model;
 
 namespace TeslaCharging
@@ -76,22 +79,17 @@ namespace TeslaCharging
             {
                 try
                 {
-                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "stuff");
-                    var parameters = new Dictionary<string, string>()
-                    {
-                        {"grant_type", "password"}, {"client_id", Environment.GetEnvironmentVariable("TeslaClientId")},
-                        {"client_secret", Environment.GetEnvironmentVariable("TeslaClientSecret")},
-                        {"email", loginData.Email}, {"password", loginData.Password}
-                    };
-                    var encodedContent = new FormUrlEncodedContent(parameters);
+                    var stringContent = new StringContent(
+                        $"{{ \"email\": \"{loginData.Email}\", \"password\": \"{loginData.Password}\" }}",
+                        Encoding.UTF8);
 
                     var tokenResponse =
-                        await _httpClient.PostAsync(new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}oauth/token"),
-                            encodedContent);
-                    var tokenResult =
-                        JsonConvert.DeserializeObject<TokenResponse>(await tokenResponse.Content.ReadAsStringAsync());
-                    _httpClient.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", tokenResult.AccessToken);
+                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), stringContent);
+                    var tokenResult = await tokenResponse.Content.ReadAsStringAsync();
+
+                   _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
+                   _httpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", tokenResult);
 
                     var vehiclesResponse =
                         await _httpClient.GetStringAsync(
