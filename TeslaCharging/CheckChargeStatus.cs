@@ -81,12 +81,10 @@ namespace TeslaCharging
                 {
                     log.LogInformation("Start CallTeslApi");
 
-                    var stringContent = new StringContent(
-                        $"{{ \"email\": \"{loginData.Email}\", \"password\": \"{loginData.Password}\" }}",
-                        Encoding.UTF8);
+                    var tokenLogin = new {email = loginData.Email, password = loginData.Password};
 
-                    var tokenResponse =
-                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), stringContent);
+                   var tokenResponse =
+                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), tokenLogin);
                     var tokenResult = await tokenResponse.Content.ReadAsStringAsync();
                     log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
 
