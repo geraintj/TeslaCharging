@@ -67,10 +67,12 @@ def get_bearer_token(email, password):
         "credential": password,
     }
     resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
+    logging.info("Get Auth Code 1st post returns " + resp.status_code)
 
     ## handle captcha
     if resp.status_code != 302:
         if resp.text.find('captcha') > 0:
+            logging.info("Get Auth Code captcha found")
             captcha_resp = session.get('https://auth.tesla.com/captcha')
             captcha = solve_captcha(captcha_resp.content)
             data = {
@@ -85,6 +87,8 @@ def get_bearer_token(email, password):
             }
             resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
 
+    logging.info("Get Auth Code 2nd post returns " + resp.status_code)
+    
     code_url = resp.headers["location"]
     parsed = urlparse(code_url)
     code = urllib.parse.parse_qs(parsed.query)['code']
