@@ -5,3 +5,5 @@
 azure-functions
 requests
 urllib3
+captcha-solver
+svglib

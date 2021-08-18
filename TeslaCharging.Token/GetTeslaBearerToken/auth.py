@@ -12,10 +12,24 @@ from urllib.parse import urlparse
 import re
 import random
 import string
+import tempfile
+from reportlab.graphics import renderPM
+from svglib.svglib import svg2rlg
+from captcha_solver import CaptchaSolver
 
 def rand_str(chars=43):
     letters = string.ascii_lowercase + string.ascii_uppercase + string.digits + "-" + "_"
     return "".join(random.choice(letters) for i in range(chars))  
+
+def solve_captcha(svg):
+    with tempfile.NamedTemporaryFile(suffix='.svg', delete=False) as f:
+        f.write(svg)
+        drawing = svg2rlg(f.name)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as p:
+           renderPM.drawToFile(drawing,p.name,fmt='PNG')
+        solver = CaptchaSolver('2captcha', api_key = '287cf7967fa59fb6ac5ac4a10dbc92bd')
+        raw_data = open(p.name, 'rb').read()
+        return solver.solve_captcha(raw_data)
 
 def get_bearer_token(email, password):
     # get login page
@@ -53,6 +67,23 @@ def get_bearer_token(email, password):
         "credential": password,
     }
     resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
+
+    ## handle captcha
+    if resp.status_code != 302:
+        if resp.text.find('captcha') > 0:
+            captcha_resp = session.get('https://auth.tesla.com/captcha')
+            captcha = solve_captcha(captcha_resp.content)
+            data = {
+                "_csrf": csrf,
+                "_phase": "authenticate",
+                "_process": "1",
+                "transaction_id": transaction_id,
+                "cancel": "",
+                "identity": email,
+                "credential": password,
+                "captcha": captcha
+            }
+            resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
 
     code_url = resp.headers["location"]
     parsed = urlparse(code_url)
