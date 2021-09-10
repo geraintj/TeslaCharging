@@ -15,7 +15,7 @@ import string
 import tempfile
 from reportlab.graphics import renderPM
 from svglib.svglib import svg2rlg
-from captcha_solver import CaptchaSolver
+from twocaptcha import TwoCaptcha
 
 def rand_str(chars=43):
     letters = string.ascii_lowercase + string.ascii_uppercase + string.digits + "-" + "_"
@@ -27,9 +27,12 @@ def solve_captcha(svg):
         drawing = svg2rlg(f.name)
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as p:
            renderPM.drawToFile(drawing,p.name,fmt='PNG')
-        solver = CaptchaSolver('2captcha', api_key = '287cf7967fa59fb6ac5ac4a10dbc92bd')
-        raw_data = open(p.name, 'rb').read()
-        return solver.solve_captcha(raw_data)
+        solver = TwoCaptcha('287cf7967fa59fb6ac5ac4a10dbc92bd')
+        return solver.normal(p.name)
+
+def solve_recaptcha(sitekey, url):
+    solver = TwoCaptcha('287cf7967fa59fb6ac5ac4a10dbc92bd')
+    return solver.recaptcha(sitekey, url)
 
 def get_bearer_token(email, password):
     # get login page
@@ -83,11 +86,31 @@ def get_bearer_token(email, password):
                 "cancel": "",
                 "identity": email,
                 "credential": password,
-                "captcha": captcha
+                "captcha": captcha['code']
             }
             resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
 
     logging.info("Get Auth Code 2nd post returns " + str(resp.status_code))
+
+    ## handle recaptcha
+    if resp.status_code != 302:
+        if resp.text.find('recaptcha') > 0:
+            logging.info("Get Auth Code recaptcha found")    
+            sitekey_index = resp.text.find('sitekey')
+            sitekey= resp.text[sitekey_index+12:sitekey_index+52]
+            recaptcha = solve_recaptcha(sitekey,url)
+            data = {
+                "_csrf": csrf,
+                "_phase": "authenticate",
+                "_process": "1",
+                "transaction_id": transaction_id,
+                "cancel": "",
+                "identity": email,
+                "credential": password,
+                "captcha": captcha['code'],
+                "recaptcha": recaptcha
+            }
+            resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
 
     code_url = resp.headers["location"]
     parsed = urlparse(code_url)

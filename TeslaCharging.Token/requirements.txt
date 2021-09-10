@@ -5,5 +5,5 @@
 azure-functions
 requests
 urllib3
-captcha-solver
+2captcha-python
 svglib
