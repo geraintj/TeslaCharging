@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -59,6 +59,16 @@ namespace TeslaCharging.Tests
             throw new NotImplementedException();
         }
 
+        public Task<TResult> CallEntityAsync<TResult>(EntityId entityId, string operationName)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task CallEntityAsync(EntityId entityId, string operationName)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<TResult> CallEntityAsync<TResult>(EntityId entityId, string operationName, object operationInput)
         {
             if (typeof(TResult).Name == "ChargingStatus")
@@ -74,7 +84,22 @@ namespace TeslaCharging.Tests
             throw new NotImplementedException();
         }
 
+        public Task<TResult> CallSubOrchestratorAsync<TResult>(string functionName, object input)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<TResult> CallSubOrchestratorAsync<TResult>(string functionName, string instanceId, object input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task CallSubOrchestratorAsync(string functionName, object input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task CallSubOrchestratorAsync(string functionName, string instanceId, object input)
         {
             throw new NotImplementedException();
         }
@@ -85,12 +110,42 @@ namespace TeslaCharging.Tests
             throw new NotImplementedException();
         }
 
+        public Task CallSubOrchestratorWithRetryAsync(string functionName, RetryOptions retryOptions, object input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task CallSubOrchestratorWithRetryAsync(string functionName, RetryOptions retryOptions, string instanceId, object input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<TResult> CallSubOrchestratorWithRetryAsync<TResult>(string functionName, RetryOptions retryOptions, object input)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<T> CreateTimer<T>(DateTime fireAt, T state, CancellationToken cancelToken)
         {
             throw new NotImplementedException();
         }
 
+        public Task CreateTimer(DateTime fireAt, CancellationToken cancelToken)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<T> WaitForExternalEvent<T>(string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task WaitForExternalEvent(string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task WaitForExternalEvent(string name, TimeSpan timeout, CancellationToken cancelToken = new CancellationToken())
         {
             throw new NotImplementedException();
         }
@@ -140,7 +195,17 @@ namespace TeslaCharging.Tests
             return (TResult)Convert.ChangeType(null, typeof(TResult));
         }
 
+        public Task CallActivityAsync(string functionName, object input)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<TResult> CallActivityWithRetryAsync<TResult>(string functionName, RetryOptions retryOptions, object input)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task CallActivityWithRetryAsync(string functionName, RetryOptions retryOptions, object input)
         {
             throw new NotImplementedException();
         }
@@ -166,6 +231,16 @@ namespace TeslaCharging.Tests
         }
 
         public string StartNewOrchestration(string functionName, object input, string instanceId = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TEntityInterface CreateEntityProxy<TEntityInterface>(string entityKey)
+        {
+            throw new NotImplementedException();
+        }
+
+        public TEntityInterface CreateEntityProxy<TEntityInterface>(EntityId entityId)
         {
             throw new NotImplementedException();
         }

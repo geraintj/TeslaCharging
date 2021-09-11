@@ -1,0 +1,85 @@
+name: Build and Deploy
+env:
+  OUTPUT_PATH: ${{ github.workspace }}/.output
+  DOTNET_VERSION: '3.1.100'
+  PYTHON_VERSION: '3.9'
+  PYTHON_FUNCTIONAPP_PACKAGE_PATH: './TeslaCharging.Token'
+  
+on:
+  push:
+    branches:
+      - DddRefactor
+
+jobs:
+  build_function:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@master
+
+      - name: Setup Dotnet ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish functions
+        run: dotnet publish --configuration Release --output ${{ env.OUTPUT_PATH }}
+
+      - name: Package functions
+        uses: actions/upload-artifact@v1
+        with:
+          name: functions
+          path: ${{ env.OUTPUT_PATH }}
+
+  deploy_function:
+    runs-on: ubuntu-latest
+    needs: [build_function]
+    env:
+      FUNC_APP_NAME: TeslaCharging
+    steps:
+      - name: Download website
+        uses: actions/download-artifact@v1
+        with:
+          name: functions
+          path: ${{ env.OUTPUT_PATH }}
+
+      - name: "Login via Azure CLI"
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: "Run Azure Functions Action"
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.FUNC_APP_NAME }}
+          package: ${{ env.OUTPUT_PATH }}
+  
+  deploy_token_function:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@master
+
+    - name: Setup Python ${{ env.PYTHON_VERSION }} Environment
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+   
+    - name: 'Resolve Project Dependencies Using Pip'
+      shell: bash
+      run: |
+        pushd './${{ env.PYTHON_FUNCTIONAPP_PACKAGE_PATH }}'
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+        popd
+        
+    - name: "Login via Azure CLI"
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.TOKEN_CREDENTIALS }}
+
+    - name: "Run Azure Functions Action"
+      uses: Azure/functions-action@v1
+      with:
+        app-name: 'teslatoken'
+        package: ${{ env.PYTHON_FUNCTIONAPP_PACKAGE_PATH }}        

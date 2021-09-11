@@ -14,10 +14,13 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Azure.Documents;
+using Newtonsoft.Json.Linq;
+using TeslaCharging;
 using TeslaCharging.Model;
 
 namespace TeslaCharging
@@ -76,40 +79,40 @@ namespace TeslaCharging
             {
                 try
                 {
-                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "stuff");
-                    var parameters = new Dictionary<string, string>()
-                    {
-                        {"grant_type", "password"}, {"client_id", Environment.GetEnvironmentVariable("TeslaClientId")},
-                        {"client_secret", Environment.GetEnvironmentVariable("TeslaClientSecret")},
-                        {"email", loginData.Email}, {"password", loginData.Password}
-                    };
-                    var encodedContent = new FormUrlEncodedContent(parameters);
+                    log.LogInformation("Start CallTeslApi");
 
-                    var tokenResponse =
-                        await _httpClient.PostAsync(new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}oauth/token"),
-                            encodedContent);
-                    var tokenResult =
-                        JsonConvert.DeserializeObject<TokenResponse>(await tokenResponse.Content.ReadAsStringAsync());
-                    _httpClient.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", tokenResult.AccessToken);
+                    var tokenLogin = new {email = loginData.Email, password = loginData.Password};
+
+                   var tokenResponse =
+                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), tokenLogin);
+                    var tokenResult = await tokenResponse.Content.ReadAsStringAsync();
+                    log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
+
+                   _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
+                   _httpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", tokenResult);
 
                     var vehiclesResponse =
                         await _httpClient.GetStringAsync(
                             new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles"));
                     var vehiclesResult = JsonConvert.DeserializeObject<VehiclesResponse>(vehiclesResponse);
+                    log.LogInformation($"Vehicles response: HTTP {(string.IsNullOrEmpty(vehiclesResponse) ? "failed" : "successful")}");
 
                     var wakeUpResponse = await _httpClient.PostAsync(new Uri(
                         $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/wake_up"), null);
                     var wakeUpResult = JsonConvert.DeserializeObject<WakeUpResponse>(await wakeUpResponse.Content.ReadAsStringAsync());
+                    log.LogInformation($"Vehicles response: HTTP {wakeUpResponse.StatusCode}");
 
                     var chargeStateResponse = await _httpClient.GetStringAsync(
                         new Uri(
                             $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/charge_state"));
                     var chargeStateResult = JsonConvert.DeserializeObject<ChargeStateResponse>(chargeStateResponse);
+                    log.LogInformation($"Vehicles response: HTTP {(string.IsNullOrEmpty(chargeStateResponse) ? "failed" : "successful")}");
 
                     var driveStateResponse = await _httpClient.GetStringAsync(new Uri(
                         $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/data_request/drive_state"));
                     var driveStateResult = JsonConvert.DeserializeObject<DriveStateResponse>(driveStateResponse);
+                    log.LogInformation($"Vehicles response: HTTP {(string.IsNullOrEmpty(driveStateResponse) ? "failed" : "successful")}");
 
                     chargeStateResult.Response.Latitude = driveStateResult.Response.Latitude;
                     chargeStateResult.Response.Longitude = driveStateResult.Response.Longitude;

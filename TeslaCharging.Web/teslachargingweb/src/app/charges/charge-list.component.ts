@@ -35,6 +35,7 @@ export class ChargeListComponent implements OnInit {
     console.log("Quieres a eliminar "+ id);
     this.chargesService.deleteCharge(id).subscribe();
     console.log("Reload");
-    this.getCharges();
+    location.reload();
+
   }
 }
