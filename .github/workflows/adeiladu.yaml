@@ -104,7 +104,7 @@ jobs:
     
     - name: 'Build and push image'
       run: |
-        docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
+        docker build ./TeslaCharging.Web/teslachargingweb -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
         docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
         
     - name: 'Deploy containerised web app'
