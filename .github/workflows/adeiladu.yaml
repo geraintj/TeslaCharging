@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
-        uses: actions/checkout@master
+        uses: actions/checkout@main
 
       - name: Setup Dotnet ${{ env.DOTNET_VERSION }}
         uses: actions/setup-dotnet@v1
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: 'Checkout GitHub Action'
-      uses: actions/checkout@master
+      uses: actions/checkout@main
 
     - name: Setup Python ${{ env.PYTHON_VERSION }} Environment
       uses: actions/setup-python@v1
@@ -83,3 +83,36 @@ jobs:
       with:
         app-name: 'teslatoken'
         package: ${{ env.PYTHON_FUNCTIONAPP_PACKAGE_PATH }}        
+  
+  deploy_web_site:
+    runs-on: ubuntu-latest
+    steps: 
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@main
+
+    - name: 'Login via Azure CLI'
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: 'Login to registry'
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    
+    - name: 'Build and push image'
+      run: |
+        docker build ./TeslaCharging.Web/teslachargingweb -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
+        docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
+        
+    - name: 'Deploy containerised web app'
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: teslachargingweb
+        images: ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
+    
+    - name: Azure logout
+      run: |
+        az logout        
