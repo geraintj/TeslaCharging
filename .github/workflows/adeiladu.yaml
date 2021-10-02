@@ -104,14 +104,14 @@ jobs:
     
     - name: 'Build and push image'
       run: |
-        docker build ./TeslaCharging.Web/teslachargingweb -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
-        docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
+        docker build ./TeslaCharging.Web/teslachargingweb -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:latest
+        docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:latest
         
-    - name: 'Deploy containerised web app'
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: teslachargingweb
-        images: ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
+#    - name: 'Deploy containerised web app'
+#      uses: azure/webapps-deploy@v2
+#      with:
+#        app-name: teslachargingweb
+#        images: ${{ secrets.REGISTRY_LOGIN_SERVER }}/teslachargingweb:${{ github.sha }}
     
     - name: Azure logout
       run: |
