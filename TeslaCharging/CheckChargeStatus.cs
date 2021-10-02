@@ -67,7 +67,7 @@ namespace TeslaCharging
                     log.LogInformation($"************** Charge status not changed from {lastChargeStatus.ToString()}");
                 }
 
-                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(30);
+                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(300);
                 await context.CreateTimer(nextCheckTime, CancellationToken.None);
             }
         }
