@@ -135,7 +135,7 @@ def get_bearer_token(email, password):
         "client_id": '81527cff06843c8634fdc09e8ac0abefb46ac849f38fe1e431c2ef2106796384',
     }
     resp = session.post(os.environ["TeslaMotorsTokenUri"], headers=headers, json=payload)
-    owner_access_token = resp.json()["access_token"]
+    # owner_access_token = resp.json()["access_token"]
 
-    return owner_access_token
+    return resp.text
 
