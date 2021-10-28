@@ -41,14 +41,21 @@ namespace TeslaCharging
         {
             // get username & password from input
             var orchestrationData = context.GetInput<OrchestrationData>();
-            //log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
-
-
+            
             // set up monitor
             while (true)
             {
-                var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", orchestrationData.LoginData);
+                var tokenEntityId = new EntityId(nameof(ApiToken), "TeslaCharging");
 
+                var apiToken = await context.CallEntityAsync<ApiToken>(tokenEntityId, "Get");
+
+                if (string.IsNullOrEmpty(apiToken.AccessToken) || apiToken.Expires < DateTime.UtcNow)
+                {
+                    var tokenResponse = await context.CallActivityAsync<TokenResponse>("GetApiToken", orchestrationData.LoginData);
+                    context.SignalEntity(tokenEntityId, "Set", tokenResponse);
+                }
+                
+                var chargeState = await context.CallActivityAsync<ChargeState>("CallTeslaAPI", apiToken);
                 var lastChargeStatus = await context.CallEntityAsync<ChargingStatus>(orchestrationData.EntityId, "Get");
 
                 if (chargeState != null && chargeState.ChargingState != lastChargeStatus)
@@ -73,24 +80,17 @@ namespace TeslaCharging
         }
 
         [FunctionName("CallTeslaAPI")]
-        public async Task<ChargeState> CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
+        public async Task<ChargeState> CallTeslaApi([ActivityTrigger] ApiToken apiToken, ILogger log)
         {
-            if (loginData != null)
+            log.LogInformation("Start CallTeslApi");
+
+            if (apiToken != null)
             {
                 try
                 {
-                    log.LogInformation("Start CallTeslApi");
-
-                    var tokenLogin = new {email = loginData.Email, password = loginData.Password};
-
-                   var tokenResponse =
-                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), tokenLogin);
-                    var tokenResult = await tokenResponse.Content.ReadAsStringAsync();
-                    log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
-
-                   _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
-                   _httpClient.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", tokenResult);
+                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
+                    _httpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", apiToken.AccessToken);
 
                     var vehiclesResponse =
                         await _httpClient.GetStringAsync(
@@ -127,6 +127,33 @@ namespace TeslaCharging
                 }
             }
             return null;
+        }
+
+        [FunctionName("GetApiToken")]
+        public async Task<TokenResponse> GetApiToken([ActivityTrigger] TeslaLogin loginData, ILogger log)
+        {
+            log.LogInformation("Start GetApiToken");
+
+            try
+            {
+                var tokenLogin = new TeslaLogin() { Email = loginData.Email, Password = loginData.Password };
+
+                var tokenResponse =
+                    await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), tokenLogin, new CancellationToken());
+                //var tokenResult = JsonConvert.DeserializeObject<TokenResponse>(await tokenResponse.Content.ReadAsStringAsync());
+
+                var tokenResult = new TokenResponse()
+                    {AccessToken = "eu-f0ca1e71aec8c1543b64e659aba1f11c8322413517ecdf2f5b10ce6b9c9ec5d1"};
+
+                log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
+
+                return tokenResult;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
 
         [FunctionName("SaveCharge")]

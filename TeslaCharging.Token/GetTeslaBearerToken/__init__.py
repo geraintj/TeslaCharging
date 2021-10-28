@@ -5,6 +5,12 @@ from .auth import get_bearer_token
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
+    
+    if req.get_body() == None or len(req.get_body()) == 0:
+        return func.HttpResponse(
+             "Invalid requets.",
+             status_code=400
+        )
 
     req_body = req.get_json()
     email = req_body.get('email')
