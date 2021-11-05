@@ -41,7 +41,7 @@ namespace TeslaCharging
         {
             // get username & password from input
             var orchestrationData = context.GetInput<OrchestrationData>();
-            //log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
+            log.LogInformation($"Executing 'OrchestrateCheck' with email '{orchestrationData.LoginData.Email}''");
 
 
             // set up monitor
@@ -79,13 +79,11 @@ namespace TeslaCharging
             {
                 try
                 {
-                    log.LogInformation("Start CallTeslApi");
+                    log.LogInformation("Start CallTeslApi without getting token");
 
                     var tokenLogin = new {email = loginData.Email, password = loginData.Password};
 
-                    //var tokenResponse = await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), tokenLogin);
-                    var tokenResult = Environment.GetEnvironmentVariable("TeslaToken");// await tokenResponse.Content.ReadAsStringAsync();
-                    //log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
+                    var tokenResult = Environment.GetEnvironmentVariable("TeslaToken");
 
                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
                    _httpClient.DefaultRequestHeaders.Authorization =
