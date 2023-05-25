@@ -2,7 +2,6 @@ using LocationTest;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.Documents.Linq;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -18,6 +17,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Azure.Documents;
 using Newtonsoft.Json.Linq;
 using TeslaCharging;
@@ -134,8 +135,8 @@ namespace TeslaCharging
         [FunctionName("SaveCharge")]
         public async Task SaveCharge([ActivityTrigger] ChargeState charge, [CosmosDB(
             databaseName: "ChargeState",
-            collectionName: "Charges",
-            ConnectionStringSetting = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
+            containerName: "Charges",
+            Connection = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
         {
             var client = new HttpClient();
             var locationResponse = await client.PostAsync(Environment.GetEnvironmentVariable(
@@ -165,25 +166,27 @@ namespace TeslaCharging
 
         [FunctionName("GetSavedCharges")]
         public async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = "charges/{vin}")] HttpRequest req,
-            [CosmosDB(ConnectionStringSetting = "CosmosConnection")] DocumentClient client,
+            [CosmosDB(Connection = "CosmosConnection")] CosmosClient client,
             ILogger log, string vin)
         {
             //TODO: validation for null vin
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            Uri chargeCollectionUri = UriFactory.CreateDocumentCollectionUri(databaseId: "ChargeState", collectionId: "Charges");
+            var container = client.GetContainer(databaseId: "ChargeState", containerId: "Charges");
 
-            var options = new FeedOptions { EnableCrossPartitionQuery = true }; 
+            IOrderedQueryable<TeslaCharge> queryable = container.GetItemLinqQueryable<TeslaCharge>();
 
-            IDocumentQuery<TeslaCharge> query = client.CreateDocumentQuery<TeslaCharge>(chargeCollectionUri, options)
-                .Where(c => c.Vin == vin)
-                .AsDocumentQuery();
+            var results = queryable.Where(x => x.Vin == vin);
+
+            using FeedIterator<TeslaCharge> query = results.ToFeedIterator();
 
             var savedCharges = new List<TeslaCharge>();
 
             while (query.HasMoreResults)
             {
-                foreach (TeslaCharge charge in await query.ExecuteNextAsync())
+                FeedResponse<TeslaCharge> response = await query.ReadNextAsync();
+
+                foreach (TeslaCharge charge in response)
                 {
                     savedCharges.Add(charge);
                 }
@@ -195,8 +198,8 @@ namespace TeslaCharging
         [FunctionName("DeleteSavedCharge")]
         public async Task<IActionResult> DeleteSavedCharge([HttpTrigger(AuthorizationLevel.Function, "delete", Route = "charges/{vin}/{id}")]
             HttpRequest req,
-            [CosmosDB(ConnectionStringSetting = "CosmosConnection")]
-            DocumentClient client,
+            [CosmosDB(Connection = "CosmosConnection")]
+            CosmosClient client,
             ILogger log,
             string vin,
             string id)
@@ -204,10 +207,10 @@ namespace TeslaCharging
             //TODO: validation for null  id
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            var documentUri = UriFactory.CreateDocumentUri(databaseId: "ChargeState", collectionId: "Charges", id);
+            var container = client.GetContainer(databaseId: "ChargeState", containerId: "Charges");
             try
             {
-                var response = await client.DeleteDocumentAsync(documentUri, new RequestOptions() { PartitionKey = new PartitionKey(Undefined.Value) });
+                var response = await container.DeleteItemAsync<TeslaCharge>(id, new PartitionKey(string.Empty));
 
                 if (response.StatusCode == HttpStatusCode.Accepted
                     || response.StatusCode == HttpStatusCode.Created
