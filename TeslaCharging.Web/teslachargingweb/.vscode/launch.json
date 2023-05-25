@@ -10,13 +10,6 @@
             "name": "Launch Edge against localhost",
             "url": "http://localhost:4200",
             "webRoot": "${workspaceFolder}"
-        },
-        {
-            "name": "Docker Node.js Launch",
-            "type": "docker",
-            "request": "launch",
-            "preLaunchTask": "docker-run: debug",
-            "platform": "node"
         }
     ]
 }

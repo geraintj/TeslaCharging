@@ -1,8 +1,8 @@
 using LocationTest;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Documents.Client;
-using Microsoft.Azure.Documents.Linq;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -18,9 +18,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
-using Microsoft.Azure.Documents;
-using Newtonsoft.Json.Linq;
-using TeslaCharging;
 using TeslaCharging.Model;
 
 namespace TeslaCharging
@@ -41,49 +38,54 @@ namespace TeslaCharging
         {
             // get username & password from input
             var orchestrationData = context.GetInput<OrchestrationData>();
-            log.LogInformation($"Executing 'OrchestrateCheck' with email '{orchestrationData.LoginData.Email}''");
+            //log.LogInformation($"Executing 'OrchestrateCheck' with email '{loginData.Email}''");
 
 
             // set up monitor
             while (true)
             {
-                var vehicleData = await context.CallActivityAsync<DataResponse>("CallTeslaAPI", orchestrationData.LoginData);
+                var dataResponse = await context.CallActivityAsync<DataResponse>("CallTeslaAPI", orchestrationData.LoginData);
 
                 var lastChargeStatus = await context.CallEntityAsync<ChargingStatus>(orchestrationData.EntityId, "Get");
 
-                if (vehicleData != null && vehicleData.ChargeState.ChargingState != lastChargeStatus)
+                if (dataResponse != null && dataResponse.ChargeState.ChargingState != lastChargeStatus)
                 {
                     if (lastChargeStatus == ChargingStatus.Charging)
                     {
-                        log.LogInformation($"************** SAVE TO DB, new: {vehicleData.ChargeState.ChargingState}; old: {lastChargeStatus}");
-                        await context.CallActivityAsync("SaveCharge", vehicleData);
+                        log.LogInformation($"************** SAVE TO DB, new: {dataResponse.ChargeState.ChargingState}; old: {lastChargeStatus}");
+                        await context.CallActivityAsync("SaveCharge", dataResponse);
                     } 
-                    log.LogInformation($"************** Setting LastChargeStatus in Entity to {vehicleData.ChargeState.ChargingState.ToString()}. Replaying {context.IsReplaying}");
+                    log.LogInformation($"************** Setting LastChargeStatus in Entity to {dataResponse.ChargeState.ChargingState.ToString()}. Replaying {context.IsReplaying}");
 
-                    context.SignalEntity(orchestrationData.EntityId, "Set", vehicleData.ChargeState.ChargingState);
+                    context.SignalEntity(orchestrationData.EntityId, "Set", dataResponse.ChargeState.ChargingState);
                 }
                 else
                 {
                     log.LogInformation($"************** Charge status not changed from {lastChargeStatus.ToString()}");
                 }
 
-                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(300);
+                var nextCheckTime = context.CurrentUtcDateTime.AddSeconds(30);
                 await context.CreateTimer(nextCheckTime, CancellationToken.None);
             }
         }
 
         [FunctionName("CallTeslaAPI")]
-        public async Task<DataResponseMessage> CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
+        public async Task<DataResponse> CallTeslaApi([ActivityTrigger] TeslaLogin loginData, ILogger log)
         {
             if (loginData != null)
             {
                 try
                 {
-                    log.LogInformation("Start CallTeslApi without getting token");
+                    log.LogInformation("Start CallTeslApi");
 
-                    var tokenLogin = new {email = loginData.Email, password = loginData.Password};
+                    var stringContent = new StringContent(
+                        $"{{ \"email\": \"{loginData.Email}\", \"password\": \"{loginData.Password}\" }}",
+                        Encoding.UTF8);
 
-                    var tokenResult = Environment.GetEnvironmentVariable("TeslaToken");
+                    var tokenResponse =
+                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), stringContent);
+                    var tokenResult = await tokenResponse.Content.ReadAsStringAsync();
+                    log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
 
                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
                    _httpClient.DefaultRequestHeaders.Authorization =
@@ -92,32 +94,24 @@ namespace TeslaCharging
                     var vehiclesResponse =
                         await _httpClient.GetStringAsync(
                             new Uri($"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles"));
-                    if (string.IsNullOrEmpty(vehiclesResponse))
-                    {
-                        log.LogCritical("Vehicles response null");
-                        return null;
-                    }
                     var vehiclesResult = JsonConvert.DeserializeObject<VehiclesResponse>(vehiclesResponse);
+                    log.LogInformation($"Vehicles response: HTTP {(string.IsNullOrEmpty(vehiclesResponse) ? "failed" : "successful")}");
 
                     var wakeUpResponse = await _httpClient.PostAsync(new Uri(
                         $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/wake_up"), null);
-                    var wakeUpResponseString = await wakeUpResponse.Content.ReadAsStringAsync();
-                    if (string.IsNullOrEmpty(wakeUpResponseString))
-                    {
-                        log.LogCritical("Wake Up response null");
-                        return null;
-                    }
-                    var wakeUpResult = JsonConvert.DeserializeObject<WakeUpResponse>(wakeUpResponseString);
+                    var wakeUpResult = JsonConvert.DeserializeObject<WakeUpResponse>(await wakeUpResponse.Content.ReadAsStringAsync());
+                    log.LogInformation($"Vehicles response: HTTP {wakeUpResponse.StatusCode}");
 
-                    var dataResponse = await _httpClient.GetStringAsync(
+                    var dataResponseString = await _httpClient.GetStringAsync(
                         new Uri(
                             $"{Environment.GetEnvironmentVariable("TeslaUri")}api/1/vehicles/{vehiclesResult.Response[0].Id}/vehicle_data"));
-                    if (string.IsNullOrEmpty(dataResponse))
+                    if (string.IsNullOrEmpty(dataResponseString))
                     {
                         log.LogCritical("Data response null");
                         return null;
                     }
-                    return JsonConvert.DeserializeObject<DataResponseMessage>(dataResponse);
+                    var dataResponseMessage = JsonConvert.DeserializeObject<DataResponseMessage>(dataResponseString);
+                    return dataResponseMessage.Response;
                 }
                 catch (Exception e)
                 {
@@ -129,21 +123,21 @@ namespace TeslaCharging
         }
 
         [FunctionName("SaveCharge")]
-        public async Task SaveCharge([ActivityTrigger] DataResponse data, [CosmosDB(
+        public async Task SaveCharge([ActivityTrigger] DataResponse dataResponse, [CosmosDB(
             databaseName: "ChargeState",
-            collectionName: "Charges",
-            ConnectionStringSetting = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
+            containerName: "Charges",
+            Connection = "CosmosConnection")]IAsyncCollector<TeslaCharge> teslaCharge, ILogger log)
         {
             var client = new HttpClient();
             var locationResponse = await client.PostAsync(Environment.GetEnvironmentVariable(
                 "GoogleReverseGeocodeUri") +
-                $"?latlng={data.DriveState.Latitude},{data.DriveState.Longitude}&key={Environment.GetEnvironmentVariable("GoogleMapsApiKey")}", null);
+                $"?latlng={dataResponse.DriveState.Latitude},{dataResponse.DriveState.Longitude}&key={Environment.GetEnvironmentVariable("GoogleMapsApiKey")}", null);
             var locationResult = JsonConvert.DeserializeObject<ReverseResponse>(await locationResponse.Content.ReadAsStringAsync());
 
             var newCharge = new TeslaCharge()
             {
-                Vin = data.Vin,
-                Amount = data.ChargeState.ChargeEnergyAdded,
+                Vin = dataResponse.Vin,
+                Amount = dataResponse.ChargeState.ChargeEnergyAdded,
                 Date = DateTime.UtcNow,
                 Location = locationResult.Results[0].FormattedAddress
             };
@@ -162,25 +156,27 @@ namespace TeslaCharging
 
         [FunctionName("GetSavedCharges")]
         public async Task<IActionResult> GetSavedCharges([HttpTrigger(AuthorizationLevel.Function, "get", Route = "charges/{vin}")] HttpRequest req,
-            [CosmosDB(ConnectionStringSetting = "CosmosConnection")] DocumentClient client,
+            [CosmosDB(Connection = "CosmosConnection")] CosmosClient client,
             ILogger log, string vin)
         {
             //TODO: validation for null vin
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            Uri chargeCollectionUri = UriFactory.CreateDocumentCollectionUri(databaseId: "ChargeState", collectionId: "Charges");
+            var container = client.GetContainer(databaseId: "ChargeState", containerId: "Charges");
 
-            var options = new FeedOptions { EnableCrossPartitionQuery = true }; 
+            IOrderedQueryable<TeslaCharge> queryable = container.GetItemLinqQueryable<TeslaCharge>();
 
-            IDocumentQuery<TeslaCharge> query = client.CreateDocumentQuery<TeslaCharge>(chargeCollectionUri, options)
-                .Where(c => c.Vin == vin)
-                .AsDocumentQuery();
+            var results = queryable.Where(x => x.Vin == vin);
+
+            using FeedIterator<TeslaCharge> query = results.ToFeedIterator();
 
             var savedCharges = new List<TeslaCharge>();
 
             while (query.HasMoreResults)
             {
-                foreach (TeslaCharge charge in await query.ExecuteNextAsync())
+                FeedResponse<TeslaCharge> response = await query.ReadNextAsync();
+
+                foreach (TeslaCharge charge in response)
                 {
                     savedCharges.Add(charge);
                 }
@@ -192,8 +188,8 @@ namespace TeslaCharging
         [FunctionName("DeleteSavedCharge")]
         public async Task<IActionResult> DeleteSavedCharge([HttpTrigger(AuthorizationLevel.Function, "delete", Route = "charges/{vin}/{id}")]
             HttpRequest req,
-            [CosmosDB(ConnectionStringSetting = "CosmosConnection")]
-            DocumentClient client,
+            [CosmosDB(Connection = "CosmosConnection")]
+            CosmosClient client,
             ILogger log,
             string vin,
             string id)
@@ -201,10 +197,10 @@ namespace TeslaCharging
             //TODO: validation for null  id
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            var documentUri = UriFactory.CreateDocumentUri(databaseId: "ChargeState", collectionId: "Charges", id);
+            var container = client.GetContainer(databaseId: "ChargeState", containerId: "Charges");
             try
             {
-                var response = await client.DeleteDocumentAsync(documentUri, new RequestOptions() { PartitionKey = new PartitionKey(Undefined.Value) });
+                var response = await container.DeleteItemAsync<TeslaCharge>(id, new PartitionKey(string.Empty));
 
                 if (response.StatusCode == HttpStatusCode.Accepted
                     || response.StatusCode == HttpStatusCode.Created

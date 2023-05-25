@@ -1,7 +1,6 @@
-﻿namespace TeslaCharging.Model
+﻿namespace TeslaCharging.Model;
+
+public class DataResponseMessage
 {
-    public class DataResponseMessage
-    {
-        public DataResponse Response { get; set; }
-    }
+    public DataResponse Response { get; set; }
 }
