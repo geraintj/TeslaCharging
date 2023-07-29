@@ -84,6 +84,7 @@ namespace TeslaCharging
                     var tokenLogin = new {email = loginData.Email, password = loginData.Password};
 
                     var tokenResult = Environment.GetEnvironmentVariable("TeslaToken");
+                    tokenResult = tokenResult.Replace(Environment.NewLine, string.Empty);
 
                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
                    _httpClient.DefaultRequestHeaders.Authorization =
