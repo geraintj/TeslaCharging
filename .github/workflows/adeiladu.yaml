@@ -1,7 +1,7 @@
 name: Build and Deploy
 env:
   OUTPUT_PATH: ${{ github.workspace }}/.output
-  DOTNET_VERSION: '3.1.100'
+  DOTNET_VERSION: '6.0.x'
   PYTHON_VERSION: '3.9'
   PYTHON_FUNCTIONAPP_PACKAGE_PATH: './TeslaCharging.Token'
   

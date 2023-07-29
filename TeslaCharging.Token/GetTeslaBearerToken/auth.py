@@ -12,27 +12,10 @@ from urllib.parse import urlparse
 import re
 import random
 import string
-import tempfile
-from reportlab.graphics import renderPM
-from svglib.svglib import svg2rlg
-from twocaptcha import TwoCaptcha
 
 def rand_str(chars=43):
     letters = string.ascii_lowercase + string.ascii_uppercase + string.digits + "-" + "_"
     return "".join(random.choice(letters) for i in range(chars))  
-
-def solve_captcha(svg):
-    with tempfile.NamedTemporaryFile(suffix='.svg', delete=False) as f:
-        f.write(svg)
-        drawing = svg2rlg(f.name)
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as p:
-           renderPM.drawToFile(drawing,p.name,fmt='PNG')
-        solver = TwoCaptcha('287cf7967fa59fb6ac5ac4a10dbc92bd')
-        return solver.normal(p.name)
-
-def solve_recaptcha(sitekey, url):
-    solver = TwoCaptcha('287cf7967fa59fb6ac5ac4a10dbc92bd')
-    return solver.recaptcha(sitekey, url)
 
 def get_bearer_token(email, password):
     # get login page
@@ -70,47 +53,6 @@ def get_bearer_token(email, password):
         "credential": password,
     }
     resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
-    logging.info("Get Auth Code 1st post returns " + str(resp.status_code))
-
-    ## handle captcha
-    if resp.status_code != 302:
-        if resp.text.find('captcha') > 0:
-            logging.info("Get Auth Code captcha found")
-            captcha_resp = session.get('https://auth.tesla.com/captcha')
-            captcha = solve_captcha(captcha_resp.content)
-            data = {
-                "_csrf": csrf,
-                "_phase": "authenticate",
-                "_process": "1",
-                "transaction_id": transaction_id,
-                "cancel": "",
-                "identity": email,
-                "credential": password,
-                "captcha": captcha['code']
-            }
-            resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
-
-    logging.info("Get Auth Code 2nd post returns " + str(resp.status_code))
-
-    ## handle recaptcha
-    if resp.status_code != 302:
-        if resp.text.find('recaptcha') > 0:
-            logging.info("Get Auth Code recaptcha found")    
-            sitekey_index = resp.text.find('sitekey')
-            sitekey= resp.text[sitekey_index+12:sitekey_index+52]
-            recaptcha = solve_recaptcha(sitekey,url)
-            data = {
-                "_csrf": csrf,
-                "_phase": "authenticate",
-                "_process": "1",
-                "transaction_id": transaction_id,
-                "cancel": "",
-                "identity": email,
-                "credential": password,
-                "captcha": captcha['code'],
-                "recaptcha": recaptcha
-            }
-            resp = session.post(auth_url, headers=headers, data=data, allow_redirects=False)
 
     code_url = resp.headers["location"]
     parsed = urlparse(code_url)

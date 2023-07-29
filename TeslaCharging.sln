@@ -1,15 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29326.143
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33627.172
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TeslaCharging", "TeslaCharging\TeslaCharging.csproj", "{00D5675A-B196-4BCA-BFE2-9672199961B0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleApi.Geocode", "GoogleApi.Geocode\GoogleApi.Geocode.csproj", "{309E8446-4BC4-41C5-BAA1-6CECA3B105A3}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TeslaCharging.Model", "TeslaCharging.Model\TeslaCharging.Model.csproj", "{EB371912-E054-499C-8B07-157AA9865439}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TeslaCharging.Tests", "TeslaCharging.Tests\TeslaCharging.Tests.csproj", "{FD7577E0-863B-482D-8FAD-E691D5160A46}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TeslaCharging.Services", "TeslaCharging.Services\TeslaCharging.Services.csproj", "{4F29E3A8-0607-4C8A-B1D6-6C924ED3D633}"
 EndProject
@@ -31,10 +29,6 @@ Global
 		{EB371912-E054-499C-8B07-157AA9865439}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EB371912-E054-499C-8B07-157AA9865439}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EB371912-E054-499C-8B07-157AA9865439}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FD7577E0-863B-482D-8FAD-E691D5160A46}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FD7577E0-863B-482D-8FAD-E691D5160A46}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FD7577E0-863B-482D-8FAD-E691D5160A46}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FD7577E0-863B-482D-8FAD-E691D5160A46}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4F29E3A8-0607-4C8A-B1D6-6C924ED3D633}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4F29E3A8-0607-4C8A-B1D6-6C924ED3D633}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F29E3A8-0607-4C8A-B1D6-6C924ED3D633}.Release|Any CPU.ActiveCfg = Release|Any CPU
