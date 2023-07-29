@@ -82,10 +82,9 @@ namespace TeslaCharging
                         $"{{ \"email\": \"{loginData.Email}\", \"password\": \"{loginData.Password}\" }}",
                         Encoding.UTF8);
 
-                    var tokenResponse =
-                        await _httpClient.PostAsJsonAsync(new Uri(Environment.GetEnvironmentVariable("TeslaTokenUri")), stringContent);
-                    var tokenResult = await tokenResponse.Content.ReadAsStringAsync();
-                    log.LogInformation($"Token response: HTTP {tokenResponse.StatusCode}");
+
+                    var tokenResult = Environment.GetEnvironmentVariable("TeslaToken");
+                    tokenResult = tokenResult.Replace(Environment.NewLine, string.Empty);
 
                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "TeslaCharging");
                    _httpClient.DefaultRequestHeaders.Authorization =
